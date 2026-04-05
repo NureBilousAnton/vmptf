@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Дані про себе</title>
+</head>
+
+<body>
+    <h1>Дані про себе</h1>
+    <div id="output">Завантаження...</div>
+
+    <script>
+        fetch("data.json")
+            .then((response) => response.text())
+            .then((text) => {
+                const data = JSON.parse(text);
+
+                // Description List, Term, Description
+                const dl = document.createElement("dl");
+
+                const dtName = document.createElement("dt");
+                dtName.textContent = "Ім'я";
+                const ddName = document.createElement("dd");
+                ddName.textContent = data.name;
+
+                const dtAge = document.createElement("dt");
+                dtAge.textContent = "Вік";
+                const ddAge = document.createElement("dd");
+                ddAge.textContent = data.age;
+
+                const dtHobbies = document.createElement("dt");
+                dtHobbies.textContent = "Хобі";
+                const ddHobbies = document.createElement("dd");
+                const ul = document.createElement("ul");
+                data.hobbies.forEach((hobby) => {
+                    const li = document.createElement("li");
+                    li.textContent = hobby;
+                    ul.appendChild(li);
+                });
+                ddHobbies.appendChild(ul);
+
+                dl.append(dtName, ddName, dtAge, ddAge, dtHobbies, ddHobbies);
+
+                document.getElementById("output").replaceWith(dl);
+            })
+            .catch((err) => {
+                document.getElementById("output").textContent = "Помилка: " + err.message;
+            });
+    </script>
+</body>
+
+</html>

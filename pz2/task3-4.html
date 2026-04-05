@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Список користувачів</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 720px;
+            margin: 2rem auto;
+        }
+
+        h2 {
+            margin-top: 2rem;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 0.3rem;
+        }
+
+        /* Фільтр */
+        .filters {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .filters button {
+            padding: 0.3rem 0.9rem;
+            border: 1px solid #aaa;
+            background: #f5f5f5;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .filters button.active {
+            background: #0057b7;
+            color: #fff;
+            border-color: #0057b7;
+        }
+
+        /* Таблиця */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f0f0f0;
+        }
+
+        /* Бейджики груп */
+        .badge {
+            display: inline-block;
+            font-size: 0.75rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 10px;
+            white-space: nowrap;
+        }
+
+        .badge-target {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        .badge-regular {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .badge-other {
+            background: #f3f4f6;
+            color: #555;
+        }
+
+        #api-status {
+            color: #888;
+            font-style: italic;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Користувачі</h1>
+
+    <h2>Локальні користувачі</h2>
+    <div class="filters" id="filters"></div>
+    <table>
+        <thead>
+            <tr>
+                <th>Ім'я</th>
+                <th>Email</th>
+                <th>Група</th>
+            </tr>
+        </thead>
+        <tbody id="local-tbody"></tbody>
+    </table>
+
+    <h2>Користувачі з API <span id="api-status">(завантаження...)</span></h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Ім'я</th>
+                <th>Email</th>
+                <th>Компанія</th>
+            </tr>
+        </thead>
+        <tbody id="api-tbody"></tbody>
+    </table>
+
+    <script>
+        const GROUPS = {
+            target: {label: "Цільова Аудиторія", cls: "badge-target"},
+            regular: {label: "Постійні клієнти", cls: "badge-regular"},
+            other: {label: "Інші", cls: "badge-other"},
+        };
+
+        const localUsers = [
+            {name: "Тарас Шевченко", email: "taras@kobzar.ua", group: "target"},
+            {name: "Іван Франко", email: "ivan@franko.ua", group: "regular"},
+            {name: "Леся Українка", email: "lesia@ukrainka.ua", group: "target"},
+            {name: "Михайло Коцюбинський", email: "mykhailo@sun.ua", group: "regular"},
+            {name: "Ольга Кобилянська", email: "olha@kobyl.ua", group: "other"},
+            {name: "Борис Грінченко", email: "borys@hrinch.ua", group: "other"},
+        ];
+
+        let activeFilter = "all";
+
+        function renderLocalUsers() {
+            const tbody = document.getElementById("local-tbody");
+            tbody.innerHTML = "";
+
+            const filtered = activeFilter === "all"
+                ? localUsers
+                : localUsers.filter((u) => u.group === activeFilter);
+
+            filtered.forEach((user) => {
+                const g = GROUPS[user.group];
+                const tr = document.createElement("tr");
+                tr.innerHTML =
+                    `<td>${user.name}</td>` +
+                    `<td>${user.email}</td>` +
+                    `<td><span class="badge ${g.cls}">${g.label}</span></td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function buildFilters() {
+            const container = document.getElementById("filters");
+            const options = [["all", "Усі"], ...Object.entries(GROUPS).map(([k, v]) => [k, v.label])];
+
+            options.forEach(([key, label]) => {
+                const btn = document.createElement("button");
+                btn.textContent = label;
+                if (key === activeFilter) btn.classList.add("active");
+                btn.addEventListener("click", () => {
+                    activeFilter = key;
+                    container.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
+                    btn.classList.add("active");
+                    renderLocalUsers();
+                });
+                container.appendChild(btn);
+            });
+        }
+
+        buildFilters();
+        renderLocalUsers();
+
+        fetch("https://jsonplaceholder.typicode.com/users")
+            .then((response) => response.json())
+            .then((users) => {
+                document.getElementById("api-status").textContent = `(${users.length} записів)`;
+
+                const tbody = document.getElementById("api-tbody");
+                users.forEach((user) => {
+                    const tr = document.createElement("tr");
+                    tr.innerHTML =
+                        `<td>${user.name}</td>` +
+                        `<td>${user.email}</td>` +
+                        `<td>${user.company.name}</td>`;
+                    tbody.appendChild(tr);
+                });
+            })
+            .catch((err) => {
+                document.getElementById("api-status").textContent = "помилка: " + err.message;
+            });
+    </script>
+</body>
+
+</html>

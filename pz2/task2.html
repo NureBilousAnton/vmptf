@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8">
+    <title>JSON Парсер</title>
+    <style>
+        body {
+            font-family: monospace;
+            max-width: 720px;
+            margin: 2rem auto;
+        }
+
+        textarea {
+            width: 100%;
+            height: 200px;
+            font-family: monospace;
+        }
+
+        button {
+            cursor: pointer;
+            margin-top: 0.5rem;
+            padding: 0.5rem 1.5rem;
+        }
+
+        #error {
+            color: crimson;
+            margin-top: 0.5rem;
+        }
+
+        /*  Дерево  */
+
+        #tree {
+            margin-top: 1rem;
+        }
+
+        details {
+            margin-left: 1.2rem;
+        }
+
+        summary {
+            cursor: pointer;
+            list-style: none;
+        }
+
+        summary::before {
+            content: "+ ";
+            font-size: 0.7rem;
+        }
+
+        details[open]>summary::before {
+            content: "- ";
+        }
+
+        .key {
+            color: #0086c1;
+        }
+
+        .str {
+            color: #24a443;
+        }
+
+        .num {
+            color: #c2185b;
+        }
+
+        .bool {
+            color: #b500a9;
+        }
+
+        .null {
+            color: #888;
+        }
+
+        .type {
+            color: #aaa;
+            font-size: 0.8rem;
+            margin-left: 0.4rem;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>JSON Парсер</h1>
+    <textarea id="input" placeholder='Введіть JSON, наприклад: {"name":"Тарас","age":42}'></textarea>
+    <br>
+    <button id="btn">Розібрати</button>
+    <div id="error"></div>
+    <div id="tree"></div>
+
+    <script>
+        // Рекурсивно будує DOM-дерево з довільного значення
+        function buildNode(value, label) {
+            if (Array.isArray(value)) {
+                const details = document.createElement("details");
+                details.open = true;
+                const summary = document.createElement("summary");
+                summary.innerHTML =
+                    (label !== undefined ? `<span class="key">${label}</span>: ` : "") +
+                    `Array <span class="type">[${value.length}]</span>`;
+                details.appendChild(summary);
+                value.forEach((item, i) => details.appendChild(buildNode(item, i)));
+                return details;
+            }
+
+            if (value !== null && typeof value === "object") {
+                const keys = Object.keys(value);
+                const details = document.createElement("details");
+                details.open = true;
+                const summary = document.createElement("summary");
+                summary.innerHTML =
+                    (label !== undefined ? `<span class="key">${label}</span>: ` : "") +
+                    `Object <span class="type">{${keys.length}}</span>`;
+                details.appendChild(summary);
+                keys.forEach((k) => details.appendChild(buildNode(value[k], k)));
+                return details;
+            }
+
+            // Примітив
+            const span = document.createElement("div");
+            span.style.marginLeft = "1.2rem";
+            const [cls, display] = primitiveStyle(value);
+            span.innerHTML =
+                (label !== undefined ? `<span class="key">${label}</span>: ` : "") +
+                `<span class="${cls}">${display}</span>`;
+            return span;
+        }
+
+        // Хендлінг стилю примітивів
+        function primitiveStyle(value) {
+            if (value === null) return ["null", "null"];
+            if (typeof value === "string") return ["str", `"${value}"`];
+            if (typeof value === "number") return ["num", String(value)];
+            if (typeof value === "boolean") return ["bool", String(value)];
+            return ["", String(value)];
+        }
+
+        document.getElementById("btn").addEventListener("click", () => {
+            const raw = document.getElementById("input").value.trim();
+            const errEl = document.getElementById("error");
+            const treeEl = document.getElementById("tree");
+            errEl.textContent = "";
+            treeEl.innerHTML = "";
+
+            let parsed;
+            try {
+                parsed = JSON.parse(raw);
+            } catch (e) {
+                errEl.textContent = "Помилка парсингу: " + e.message;
+                return;
+            }
+
+            treeEl.appendChild(buildNode(parsed));
+        });
+    </script>
+</body>
+
+</html>

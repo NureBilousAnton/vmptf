@@ -1,0 +1,12 @@
+open:
+    $BROWSER --new-window localhost:8000 &
+
+serve:
+    uv run manage.py runserver
+
+shell:
+    uv run manage.py shell
+
+migrate:
+    uv run manage.py makemigrations
+    uv run manage.py migrate

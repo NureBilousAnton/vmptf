@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Статті</title>
+</head>
+
+<body>
+    <h1>Всі статті</h1>
+    {% for article in articles %}
+    <div>
+        <h2><a href="{% url 'article_detail' article.pk %}">{{ article.title }}</a></h2>
+        <p>Автор: {{ article.author }} | {{ article.pub_date|date:"d.m.Y" }}</p>
+    </div>
+    {% empty %}
+    <p>Статей немає.</p>
+    {% endfor %}
+</body>
+
+</html>

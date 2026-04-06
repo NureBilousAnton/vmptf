@@ -4,10 +4,12 @@ for i in range(1, 11):
     print(i)
 print()
 
-a = float(input("Введіть перше число: "))
-b = float(input("Введіть друге число: "))
-c = float(input("Введіть третє число: "))
-average = (a + b + c) / 3
+# a = float(input("Введіть перше число: "))
+# b = float(input("Введіть друге число: "))
+# c = float(input("Введіть третє число: "))
+# average = (a + b + c) / 3
+nums = list(map(float, input("числа: ").split(",")))
+average = sum(nums) / len(nums)
 print(f"Середнє значення: {average:.2f}\n")
 
 

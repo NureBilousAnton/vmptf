@@ -1,5 +1,5 @@
 open:
-    $BROWSER --new-window localhost:8000
+    $BROWSER --new-window localhost:8000 &
 
 serve:
     python -m http.server 8000

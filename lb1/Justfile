@@ -1,5 +1,11 @@
 open:
-    $BROWSER --new-window localhost:8000 &
+    $BROWSER --new-window localhost:8000/articles &
+
+open-api:
+    $BROWSER --new-window localhost:8000/articles/api &
+
+curl:
+    curl http://127.0.0.1:8000/articles/api/ | jq
 
 serve:
     uv run manage.py runserver

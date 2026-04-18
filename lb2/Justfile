@@ -1,0 +1,93 @@
+# List all available recipes
+default:
+    @just --list --unsorted
+
+# starts the dev server
+serve:
+    npm run dev
+
+open:
+    $BROWSER --new-window http://localhost:5173/ &
+
+# fetch all articles
+task1:
+    curl -s http://localhost:3000/api/articles | jq
+
+# Task2 needs auth from Task3, so they reuse task3-login below
+
+task2-add: _require-token
+    curl -s -X POST http://localhost:3000/api/articles \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $(cat .token)" \
+        -d '{"title":"Нова стаття","content":"Зміст","category_id":1}' | jq
+
+task2-comment: _require-token
+    curl -s -X POST http://localhost:3000/api/articles/1/comments \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $(cat .token)" \
+        -d '{"text":"Цікаво!"}' | jq
+
+task2-verify:
+    curl -s http://localhost:3000/api/articles/1 | jq
+
+
+task3-register:
+    curl -s -X POST http://localhost:3000/api/auth/register \
+        -H "Content-Type: application/json" \
+        -d '{"username":"testuser","password":"1234"}' | jq
+
+# Logs in and saves token to .token
+task3-login:
+    curl -s -X POST http://localhost:3000/api/auth/login \
+        -H "Content-Type: application/json" \
+        -d '{"username":"testuser","password":"1234"}' \
+        | tee /dev/stderr | jq -r '.token' > .token
+    @echo "Token saved to .token"
+
+# Should return 401
+task3-unauth:
+    @echo "expect 401"
+    curl -s -X POST http://localhost:3000/api/articles \
+        -H "Content-Type: application/json" \
+        -d '{"title":"No auth","content":"x"}' | jq
+
+# Should return 201
+task3-auth: _require-token
+    @echo "expect 201"
+    curl -s -X POST http://localhost:3000/api/articles \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $(cat .token)" \
+        -d '{"title":"Авторизована стаття","content":"Текст","category_id":2}' | jq
+
+task3-search:
+    @echo "search"
+    curl -s -G "http://localhost:3000/api/articles" --data-urlencode "search=стаття" | jq
+    @echo "category filter"
+    curl -s "http://localhost:3000/api/articles?category=1" | jq
+
+
+# Run twice - first MISS, second HIT
+task4-cache:
+    @echo "expect MISS"
+    curl -sv http://localhost:3000/api/articles 2>&1 | grep X-Cache
+    @echo "expect HIT"
+    curl -sv http://localhost:3000/api/articles 2>&1 | grep X-Cache
+
+# POST invalidates cache, next GET is MISS again
+task4-invalidate: _require-token
+    @echo "adding article to bust cache"
+    curl -s -X POST http://localhost:3000/api/articles \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $(cat .token)" \
+        -d '{"title":"Cache bust","content":"x"}' | jq
+    @echo "expect MISS after invalidation"
+    curl -sv http://localhost:3000/api/articles 2>&1 | grep X-Cache
+
+
+
+# Aborts with a clear message if .token does not exist yet
+_require-token:
+    @test -f .token || (echo "No .token file, run: just task3-login" && exit 1)
+
+clean:
+    rm -f .token blog.sqlite

@@ -1,0 +1,148 @@
+# List all available recipes
+default:
+    @just --list --unsorted
+
+up:
+    @docker compose up -d
+
+down:
+    @docker compose down
+
+down-volumes:
+    @docker compose down -v
+
+pgcli:
+    @pgcli "postgres://${DB_USER:-postgres}:${DB_PASSWORD:-password}@localhost:${DB_PORT:-5433}/${DB_NAME:-vmpt_db}?sslmode=disable"
+
+# List all products
+products:
+    @curl -s "http://localhost:${API_PORT:-3000}/products" | jq
+
+# List all categories
+categories:
+    @curl -s "http://localhost:${API_PORT:-3000}/categories" | jq
+
+# List all users
+users:
+    @curl -s "http://localhost:${API_PORT:-3000}/users" | jq
+
+# List all reviews
+reviews:
+    @curl -s "http://localhost:${API_PORT:-3000}/reviews" | jq
+
+# Register and return a JWT
+register email password first last:
+    @curl -s -X POST "http://localhost:${API_PORT:-3000}/rpc/register" \
+      -H 'Content-Type: application/json' \
+      -d '{"email":"{{email}}","password":"{{password}}","first_name":"{{first}}","last_name":"{{last}}"}' | jq
+
+# Log in and print the JWT
+login email password:
+    @curl -s -X POST "http://localhost:${API_PORT:-3000}/rpc/login" \
+      -H 'Content-Type: application/json' \
+      -d '{"email":"{{email}}","password":"{{password}}"}' | jq -r '.[0].token'
+
+# Get own profile
+me token:
+    @curl -s "http://localhost:${API_PORT:-3000}/me" \
+      -H "Authorization: Bearer {{token}}" | jq
+
+# List own orders
+orders token:
+    @curl -s "http://localhost:${API_PORT:-3000}/orders" \
+      -H "Authorization: Bearer {{token}}" | jq
+
+# Create an empty pending order and print its id  (just new-order <token>)
+new-order token:
+    @curl -s -X POST "http://localhost:${API_PORT:-3000}/orders" \
+      -H "Authorization: Bearer {{token}}" \
+      -H 'Content-Type: application/json' \
+      -H 'Prefer: return=representation' \
+      -d '{}' | jq -r '.[0].id'
+
+# Add a line item to an order
+add-item token order product qty price:
+    @curl -s -X POST "http://localhost:${API_PORT:-3000}/order_products" \
+      -H "Authorization: Bearer {{token}}" \
+      -H 'Content-Type: application/json' \
+      -H 'Prefer: return=representation' \
+      -d '{"order_id":"{{order}}","product_id":"{{product}}","quantity":{{qty}},"unit_price":{{price}}}'| jq
+
+# Update order status  (pending|paid|shipped|delivered|cancelled)
+set-status token order status:
+    @curl -s -X PATCH "http://localhost:${API_PORT:-3000}/orders?id=eq.{{order}}" \
+      -H "Authorization: Bearer {{token}}" \
+      -H 'Content-Type: application/json' \
+      -H 'Prefer: return=representation' \
+      -d '{"status":"{{status}}"}' | jq
+
+# Post a review
+post-review token product rating body:
+    @curl -s -X POST "http://localhost:${API_PORT:-3000}/reviews" \
+      -H "Authorization: Bearer {{token}}" \
+      -H 'Content-Type: application/json' \
+      -H 'Prefer: return=representation' \
+      -d '{"product_id":"{{product}}","rating":{{rating}},"body":"{{body}}"}' | jq
+
+# Delete own review
+delete-review token review:
+    @curl -s -X DELETE "http://localhost:${API_PORT:-3000}/reviews?id=eq.{{review}}" \
+      -H "Authorization: Bearer {{token}}" \
+      -H 'Prefer: return=representation' | jq 'if length == 0 then "not found or not yours" else .[0] end'
+
+# Full end-to-end demo: register > login > browse > order > review
+demo:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    API="http://localhost:${API_PORT:-3000}"
+
+    echo
+    echo "Register a new user"
+    just register demo@example.com demo1234 Demo User
+
+    echo
+    echo "Login"
+    TOKEN=$(just login demo@example.com demo1234)
+    echo "Token acquired: ${TOKEN}"
+
+    echo
+    echo "Browse products"
+    just products
+
+    echo
+    echo "Browse categories"
+    just categories
+
+    echo
+    echo "Own profile"
+    just me "$TOKEN"
+
+    echo
+    echo "Create order"
+    ORDER_ID=$(curl -s -X POST "$API/orders" \
+      -H "Authorization: Bearer $TOKEN" \
+      -H 'Content-Type: application/json' \
+      -H 'Prefer: return=representation' \
+      -d '{}' | jq -r '.[0].id')
+    echo "Order: $ORDER_ID"
+
+    echo
+    echo "Add line items"
+    IPHONE_ID=$(curl -s "$API/products?name=eq.iPhone%2016%20Pro" | jq -r '.[0].id')
+    PIXEL_ID=$(curl -s "$API/products?name=eq.Pixel%209" | jq -r '.[0].id')
+    just add-item "$TOKEN" "$ORDER_ID" "$IPHONE_ID" 1 54999
+    just add-item "$TOKEN" "$ORDER_ID" "$PIXEL_ID" 2 32999
+
+    echo
+    echo "Pay"
+    just set-status "$TOKEN" "$ORDER_ID" paid
+
+    echo
+    echo "Post a review"
+    just post-review "$TOKEN" "$IPHONE_ID" 5 "Excellent phone!"
+
+    echo
+    echo "Read all reviews (public)"
+    just reviews
+
+    echo "Done"

@@ -1,0 +1,85 @@
+x-db-config:
+  name: &db_name ${DB_NAME:-vmpt_db}
+  user: &db_user ${DB_USER:-postgres}
+  password: &db_password ${DB_PASSWORD:-password}
+  url: &db_url "postgres://${DB_USER:-postgres}:${DB_PASSWORD:-password}@postgres:5432/${DB_NAME:-vmpt_db}?sslmode=disable"
+  # PostgREST connects as the authenticator role, which switches to anon/authenticated per request. Must match the password set in setup.sql migration.
+  authenticator_url: &authenticator_url "postgres://authenticator:${AUTHENTICATOR_PASSWORD:-authenticator_password}@postgres:5432/${DB_NAME:-vmpt_db}?sslmode=disable"
+
+services:
+  postgres:
+    build: .
+    container_name: vmpt-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: *db_name
+      POSTGRES_USER: *db_user
+      POSTGRES_PASSWORD: *db_password
+
+    ports:
+      - "${DB_PORT:-5433}:5432"
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+      interval: 1s
+      timeout: 10s
+      retries: 5
+
+    volumes:
+      - data:/var/lib/postgresql
+
+  dbmate:
+    image: amacneil/dbmate
+    container_name: vmpt-dbmate
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    command: up
+
+    volumes:
+      - ./db:/db:ro
+
+    environment:
+      DATABASE_URL: *db_url
+
+  postgrest:
+    image: postgrest/postgrest
+    container_name: vmpt-api
+    restart: unless-stopped
+
+    depends_on:
+      dbmate:
+        condition: service_completed_successfully
+
+    ports:
+      - "${API_PORT:-3000}:3000"
+
+    environment:
+      PGRST_DB_URI: *authenticator_url
+      PGRST_DB_SCHEMA: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters}
+      PGRST_DB_PRE_REQUEST: auth.set_auth_context
+      PGRST_OPENAPI_SERVER_PROXY_URI: http://localhost:${API_PORT:-3000}
+      PGRST_OPENAPI_SECURITY_ACTIVE: "true"
+      PGRST_OPENAPI_MODE: ignore-privileges
+
+  scalar:
+    image: scalarapi/api-reference
+    container_name: vmpt-docs
+    restart: unless-stopped
+
+    depends_on:
+      - postgrest
+
+    ports:
+      - "${DOCS_PORT:-8080}:8080"
+
+    environment:
+      API_REFERENCE_CONFIG: '{"sources":[{"url":"http://localhost:${API_PORT:-3000}/"}]}'
+
+volumes:
+  data:
